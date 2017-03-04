@@ -1,5 +1,7 @@
 /***************************************************
-  This is an example for our Adafruit FONA Cellular Module
+  This is an extension of Adafruit's FONA example program,
+  modified to work with rotary phones like the Bell 500
+  and a Teensy microcontroller.
 
   Designed specifically to work with the Adafruit FONA
   ----> http://www.adafruit.com/products/1946
@@ -13,7 +15,14 @@
   please support Adafruit and open-source hardware by purchasing
   products from Adafruit!
 
-  Written by Limor Fried/Ladyada for Adafruit Industries.
+  The rotary phone uses one input pin to detect when the
+  handset has gone "off hook" and another to detect the
+  pulses of the rotary dial.  The ringer is not yet
+  supported.
+
+  Written by Limor Fried/Ladyada for Adafruit Industries
+  and Trammell Hudson <hudson@trmm.net>.
+
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
@@ -27,9 +36,10 @@ the commented section below at the end of the setup() function.
 */
 #include "Adafruit_FONA.h"
 
-#define FONA_RX 2
-#define FONA_TX 3
-#define FONA_RST 4
+// Teensy hardware serial
+#define FONA_RX 7
+#define FONA_TX 8
+#define FONA_RST 0
 
 // this is a large buffer for replies
 char replybuffer[255];
@@ -37,12 +47,12 @@ char replybuffer[255];
 // We default to using software serial. If you want to use hardware serial
 // (because softserial isnt supported) comment out the following three lines 
 // and uncomment the HardwareSerial line
-#include <SoftwareSerial.h>
-SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
-SoftwareSerial *fonaSerial = &fonaSS;
+//#include <SoftwareSerial.h>
+//SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
+//SoftwareSerial *fonaSerial = &fonaSS;
 
 // Hardware serial is also possible!
-//  HardwareSerial *fonaSerial = &Serial1;
+HardwareSerial *fonaSerial = &Serial1;
 
 // Use this for FONA 800 and 808s
 Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
@@ -54,6 +64,8 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 uint8_t type;
 
 void setup() {
+  rotary_setup();
+
   while (!Serial);
 
   Serial.begin(115200);
@@ -172,9 +184,63 @@ void printMenu(void) {
   Serial.println(F(""));
 
 }
+
+
+#define PULSE_DIAL	1  // rotary pin
+#define PULSE_HOOK	2 // not used yet
+
+void rotary_setup()
+{
+	// Pull up on the rotary pulse pins
+	pinMode(PULSE_DIAL, INPUT_PULLUP);
+	pinMode(PULSE_HOOK, INPUT_PULLUP);
+}
+
+void rotary_loop()
+{
+	static int count;
+	static int last_dial;
+	static uint32_t last_now;
+	const uint32_t now = millis();
+	const uint32_t delta = now - last_now;
+
+	// but if the transition is longer than 200ms, then it is a new number
+	if (delta > 200 && count != 0)
+	{
+		//Serial.print("--- ");
+		Serial.println(count);
+		count = 0;
+	}
+
+	// wait for a transition on the dial
+	const int dial = digitalRead(PULSE_DIAL);
+	if (dial == last_dial)
+		return;
+	// ignore transitions shorter than 5ms 
+	if (delta < 25)
+		return;
+
+	// transition!
+	if(0)
+	{
+		Serial.print(now);
+		Serial.print(' ');
+		Serial.println(dial);
+	}
+
+	last_dial = dial;
+	last_now = now;
+
+	// count the rising edge transitions
+	if (dial)
+		count++;
+}
+
 void loop() {
   Serial.print(F("FONA> "));
   while (! Serial.available() ) {
+    rotary_loop();
+
     if (fona.available()) {
       Serial.write(fona.read());
     }
