@@ -186,54 +186,228 @@ void printMenu(void) {
 }
 
 
-#define PULSE_DIAL	1  // rotary pin
-#define PULSE_HOOK	2 // not used yet
+#define PULSE_DIAL	1 // rotary pin, normally closed
+#define PULSE_HOOK	2 // off hook == 0, on hook == 1
+
+typedef enum {
+	ROTARY_INIT	= 0,
+	ROTARY_ONHOOK,
+	ROTARY_PLAY_DIALTONE,
+	ROTARY_WAIT_FIRST_PULSE,
+	ROTARY_PLAY_ERRTONE,
+	ROTARY_WAIT_ONHOOK,
+	ROTARY_PULSE_COUNT = 100,
+	ROTARY_PULSE_FALLING,
+	ROTARY_PULSE_IGNORE,
+	ROTARY_PULSE_WAIT,
+	ROTARY_ADD_DIGIT,
+	ROTARY_DIAL_NUMBER,
+	ROTARY_ON_CALL = 200,
+	ROTARY_CALL_PULSE_COUNT,
+	ROTARY_CALL_PULSE_IGNORE,
+	ROTARY_CALL_PULSE_WAIT,
+	ROTARY_CALL_DIAL_DIGIT,
+} rotary_state_t;
+
+static rotary_state_t rotary_current_state;
+static uint32_t rotary_last_transition;
+static unsigned rotary_pulses;
+static unsigned rotary_digits;
+static char rotary_number[32];
+
+static int rotary_state(int new_state)
+{
+	if (rotary_current_state == (rotary_state_t) new_state)
+		return 0;
+
+	rotary_current_state = (rotary_state_t) new_state;
+	rotary_last_transition = millis();
+
+	Serial.print(rotary_last_transition);
+	Serial.print(" state=");
+	Serial.println(new_state);
+	return new_state;
+}
 
 void rotary_setup()
 {
 	// Pull up on the rotary pulse pins
 	pinMode(PULSE_DIAL, INPUT_PULLUP);
 	pinMode(PULSE_HOOK, INPUT_PULLUP);
+
+	rotary_state(ROTARY_INIT);
 }
 
-void rotary_loop()
+// The on-hook pin is closed when we are on the phone, open when
+// we are on it.  so this inverts the sense
+static int rotary_onhook()
 {
-	static int count;
-	static int last_dial;
-	static uint32_t last_now;
+	return digitalRead(PULSE_HOOK) != 0;
+}
+
+// The dial pin is zero normally, 1 when we dialing
+static int rotary_dial()
+{
+	return digitalRead(PULSE_DIAL) != 0;
+}
+
+
+static void fona_stop_tone()
+{
+	fona.playToolkitTone(1, 20);
+	//fona.sendCheckReply(F("AT+STTONE=0,"), 0, 0t, len, ok_reply);
+}
+
+
+int rotary_loop()
+{
+	// compute the time since last transition
 	const uint32_t now = millis();
-	const uint32_t delta = now - last_now;
+	const uint32_t delta = now - rotary_last_transition;
+/*
+	Serial.print(now);
+	Serial.print(" ");
+	Serial.print(digitalRead(PULSE_HOOK));
+	Serial.print(rotary_onhook());
+	Serial.print(" ");
+	Serial.print(digitalRead(PULSE_DIAL));
+	Serial.print(rotary_dial());
+	Serial.println();
+*/
 
-	// but if the transition is longer than 200ms, then it is a new number
-	if (delta > 200 && count != 0)
+	// all states have a reset when we go back on hook
+	if(rotary_onhook())
 	{
-		//Serial.print("--- ");
-		Serial.println(count);
-		count = 0;
+		if (rotary_current_state != ROTARY_ONHOOK)
+			fona_stop_tone();
+		rotary_state(ROTARY_ONHOOK);
 	}
 
-	// wait for a transition on the dial
-	const int dial = digitalRead(PULSE_DIAL);
-	if (dial == last_dial)
-		return;
-	// ignore transitions shorter than 5ms 
-	if (delta < 25)
-		return;
-
-	// transition!
-	if(0)
+	switch(rotary_current_state)
 	{
-		Serial.print(now);
-		Serial.print(' ');
-		Serial.println(dial);
+	case ROTARY_INIT:
+		if(!rotary_onhook())
+			rotary_state(ROTARY_PLAY_ERRTONE);
+		return 0;
+
+	default:
+	case ROTARY_ONHOOK:
+		rotary_pulses = 0;
+		rotary_digits = 0;
+
+		if(!rotary_onhook())
+			return rotary_state(ROTARY_PLAY_DIALTONE);
+
+		return 0;
+
+	case ROTARY_PLAY_DIALTONE:
+		fona.playToolkitTone(20, 10000);
+		return rotary_state(ROTARY_WAIT_FIRST_PULSE);
+
+	case ROTARY_PLAY_ERRTONE:
+		fona.playToolkitTone(2, 10000);
+		return rotary_state(ROTARY_WAIT_ONHOOK);
+
+	case ROTARY_WAIT_ONHOOK:
+		// literally do nothing until we go on hook
+		return 0;
+
+	case ROTARY_WAIT_FIRST_PULSE:
+		// if they have been off hook for too long, error out
+		if (delta > 10000)
+			return rotary_state(ROTARY_PLAY_ERRTONE);
+
+		if (!rotary_dial())
+			return 0;
+
+		// they have started dialing, stop the dial tone
+		fona_stop_tone();
+		return rotary_state(ROTARY_PULSE_COUNT);
+
+	case ROTARY_PULSE_COUNT:
+		rotary_pulses++;
+
+		// if we get too many pulses, abort this call
+		if (rotary_pulses > 10)
+			return rotary_state(ROTARY_PLAY_ERRTONE);
+
+		return rotary_state(ROTARY_PULSE_IGNORE);
+
+	case ROTARY_PULSE_IGNORE:
+		if (delta < 50)
+			return 0;
+		return rotary_state(ROTARY_PULSE_FALLING);
+
+	case ROTARY_PULSE_FALLING:
+		// wait for the falling edge of the transition
+		if (!rotary_dial())
+			return rotary_state(ROTARY_PULSE_WAIT);
+		return 0;
+
+	case ROTARY_PULSE_WAIT:
+		// if they spin the dial, start counting again
+		if (rotary_dial())
+			return rotary_state(ROTARY_PULSE_COUNT);
+
+		// short timeout if we have received pulses,
+		// in which case this is a new digit.
+		if (delta > 200 && rotary_pulses != 0)
+			return rotary_state(ROTARY_ADD_DIGIT);
+
+		// long timeout if we have no pulses, in which case
+		// we have the entire number and call dial it
+		if (delta > 3000)
+			return rotary_state(ROTARY_DIAL_NUMBER);
+		return 0;
+
+	case ROTARY_ADD_DIGIT:
+		if (rotary_digits >= sizeof(rotary_number) - 1)
+			return rotary_state(ROTARY_PLAY_ERRTONE);
+
+		if (rotary_pulses == 10)
+			rotary_pulses = 0;
+
+		Serial.print("dialed ");
+		Serial.println(rotary_pulses);
+
+		rotary_number[rotary_digits++] = '0' + rotary_pulses;
+		rotary_pulses = 0;
+		return rotary_state(ROTARY_PULSE_WAIT);
+
+	case ROTARY_DIAL_NUMBER:
+		rotary_number[rotary_digits++] = '\0';
+		Serial.println(rotary_number);
+		rotary_pulses = 0;
+		rotary_digits = 0;
+		return rotary_state(ROTARY_ON_CALL);
+
+	case ROTARY_ON_CALL:
+		if (rotary_dial())
+			return rotary_state(ROTARY_CALL_PULSE_COUNT);
+		return 0;
+
+	case ROTARY_CALL_PULSE_COUNT:
+		rotary_pulses++;
+		return rotary_state(ROTARY_CALL_PULSE_IGNORE);
+
+	case ROTARY_CALL_PULSE_IGNORE:
+		if (delta < 25)
+			return 0;
+		return rotary_state(ROTARY_CALL_PULSE_WAIT);
+
+	case ROTARY_CALL_PULSE_WAIT:
+		if (delta > 200)
+			return rotary_state(ROTARY_CALL_DIAL_DIGIT);
+		if (rotary_dial())
+			return rotary_state(ROTARY_CALL_PULSE_COUNT);
+		return 0;
+
+	case ROTARY_CALL_DIAL_DIGIT:
+		Serial.print("digit ");
+		Serial.println(rotary_pulses);
+		rotary_pulses = 0;
+		return rotary_state(ROTARY_ON_CALL);
 	}
-
-	last_dial = dial;
-	last_now = now;
-
-	// count the rising edge transitions
-	if (dial)
-		count++;
 }
 
 void loop() {
