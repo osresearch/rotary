@@ -204,9 +204,12 @@ typedef enum {
 	ROTARY_DIAL_NUMBER,
 	ROTARY_ON_CALL = 200,
 	ROTARY_CALL_PULSE_COUNT,
+	ROTARY_CALL_PULSE_FALLING,
 	ROTARY_CALL_PULSE_IGNORE,
 	ROTARY_CALL_PULSE_WAIT,
 	ROTARY_CALL_DIAL_DIGIT,
+	ROTARY_CALL_CHECK_STATUS,
+	ROTARY_CALL_OVER,
 } rotary_state_t;
 
 static rotary_state_t rotary_current_state;
@@ -254,8 +257,8 @@ static int rotary_dial()
 
 static void fona_stop_tone()
 {
-	fona.playToolkitTone(1, 20);
-	//fona.sendCheckReply(F("AT+STTONE=0,"), 0, 0t, len, ok_reply);
+	//fona.playToolkitTone(1, 20);
+	fona.sendCheckReply(F("AT+STTONE=0"), F("OK"));
 }
 
 
@@ -276,10 +279,10 @@ int rotary_loop()
 */
 
 	// all states have a reset when we go back on hook
-	if(rotary_onhook())
+	if(rotary_onhook() && rotary_current_state != ROTARY_ONHOOK)
 	{
-		if (rotary_current_state != ROTARY_ONHOOK)
-			fona_stop_tone();
+		fona_stop_tone();
+		fona.hangUp();
 		rotary_state(ROTARY_ONHOOK);
 	}
 
@@ -320,9 +323,11 @@ int rotary_loop()
 		if (!rotary_dial())
 			return 0;
 
-		// they have started dialing, stop the dial tone
+		// they have started dialing, switch states (to keep the
+		// timer correct), then stop the dial tone
+		rotary_state(ROTARY_PULSE_COUNT);
 		fona_stop_tone();
-		return rotary_state(ROTARY_PULSE_COUNT);
+		return 0;
 
 	case ROTARY_PULSE_COUNT:
 		rotary_pulses++;
@@ -334,7 +339,7 @@ int rotary_loop()
 		return rotary_state(ROTARY_PULSE_IGNORE);
 
 	case ROTARY_PULSE_IGNORE:
-		if (delta < 50)
+		if (delta < 25)
 			return 0;
 		return rotary_state(ROTARY_PULSE_FALLING);
 
@@ -377,14 +382,30 @@ int rotary_loop()
 	case ROTARY_DIAL_NUMBER:
 		rotary_number[rotary_digits++] = '\0';
 		Serial.println(rotary_number);
+		fona.callPhone(rotary_number);
+
 		rotary_pulses = 0;
 		rotary_digits = 0;
+
 		return rotary_state(ROTARY_ON_CALL);
 
 	case ROTARY_ON_CALL:
 		if (rotary_dial())
 			return rotary_state(ROTARY_CALL_PULSE_COUNT);
+		if (delta > 1000)
+			return rotary_state(ROTARY_CALL_CHECK_STATUS);
 		return 0;
+
+	case ROTARY_CALL_CHECK_STATUS:
+		// if they hang up, signal that we're done
+		if (fona.getCallStatus() == 0)
+			return rotary_state(ROTARY_CALL_OVER);
+
+		return rotary_state(ROTARY_ON_CALL);
+
+	case ROTARY_CALL_OVER:
+		fona.playToolkitTone(5, 30000);
+		return rotary_state(ROTARY_WAIT_ONHOOK);
 
 	case ROTARY_CALL_PULSE_COUNT:
 		rotary_pulses++;
@@ -393,7 +414,12 @@ int rotary_loop()
 	case ROTARY_CALL_PULSE_IGNORE:
 		if (delta < 25)
 			return 0;
-		return rotary_state(ROTARY_CALL_PULSE_WAIT);
+		return rotary_state(ROTARY_CALL_PULSE_FALLING);
+
+	case ROTARY_CALL_PULSE_FALLING:
+		if (!rotary_dial())
+			return rotary_state(ROTARY_CALL_PULSE_WAIT);
+		return 0;
 
 	case ROTARY_CALL_PULSE_WAIT:
 		if (delta > 200)
@@ -403,9 +429,14 @@ int rotary_loop()
 		return 0;
 
 	case ROTARY_CALL_DIAL_DIGIT:
+		if (rotary_pulses == 10)
+			rotary_pulses = 0;
+
 		Serial.print("digit ");
 		Serial.println(rotary_pulses);
+		fona.playDTMF(rotary_pulses + '0');
 		rotary_pulses = 0;
+
 		return rotary_state(ROTARY_ON_CALL);
 	}
 }
