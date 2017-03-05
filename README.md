@@ -6,7 +6,9 @@ the pulses and implements the state machine to allow you to make
 place phone calls.  In-bound calls are not yet working; the
 ringer circuit is a work in progress.
 
-Wiring:
+Wiring
+===
+![Inside the phone](https://farm3.staticflickr.com/2808/32833764510_fcd14da721_z_d.jpg)
 
 * Teensy Gnd -> FONA Ground, FONA Key, Phone F (blue?)
 * Teensy Vcc -> FONA Vio
@@ -18,4 +20,15 @@ Wiring:
 
 You will need a computer plugged into the Teensy right now
 since it doesn't initialize the FONA until the USB serial is
-connected.
+connected.  This will need to be fixed for standalone operation.
+
+Todo
+===
+![Dialup internet](https://farm4.staticflickr.com/3845/32372052844_b7e6990ddc_z_d.jpg)
+
+* Incoming call state machine.
+* Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it.
+* PCB design to mount FONA, Teensy and wire headers for the phone connections
+* Package everything to fit into the phone.
+* Buy a red phone, cut a hole for USB charging cable
+* Teensy powered from the battery?  Battery switch?
