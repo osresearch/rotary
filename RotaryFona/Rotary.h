@@ -23,6 +23,8 @@ private:
 	unsigned digits;
 	char rotary_number[32];
 
+	unsigned bell_count;
+
 	// run the state machine
 	int state_machine();
 
@@ -33,12 +35,16 @@ private:
 	void play_tone(int tone, int len);
 	void stop_tone();
 
-	// make the phone ring (once)
-	void ring(int enable);
+	// charge the PWM to ring the bell once
+	void bell(int enable);
 
 	// Returns true if the phone is "on hook"
 	int onhook();
 
 	// Returns true when the dial is sending pulses
 	int dial();
+
+	// Returns true when the Fona tells us that
+	// the phone is "ringing".
+	int ring();
 };

@@ -18,6 +18,7 @@
 // todo move this into the constructor
 #define PULSE_DIAL	1 // rotary pin, normally closed
 #define PULSE_HOOK	2 // off hook == 0, on hook == 1
+#define PULSE_RING	6 // off hook == 0, on hook == 1
 #define ROTARY_RINGER	9 // pwm output for charge pump
 
 typedef enum {
@@ -53,6 +54,7 @@ void Rotary::begin()
 	// Pull up on the rotary pulse pins
 	pinMode(PULSE_DIAL, INPUT_PULLUP);
 	pinMode(PULSE_HOOK, INPUT_PULLUP);
+	pinMode(PULSE_RING, INPUT_PULLUP);
 
 	Timer3.initialize(10); // microsecond pulse width
 
@@ -94,17 +96,22 @@ int Rotary::dial()
 	return digitalRead(PULSE_DIAL) != 0;
 }
 
+int Rotary::ring()
+{
+	return digitalRead(PULSE_RING) == 0;
+}
+
 void Rotary::loop()
 {
 	state_machine();
 }
 
 
-void Rotary::ring(int state)
+void Rotary::bell(int state)
 {
 	if (state)
 	{
-		Timer3.pwm(ROTARY_RINGER, 900);
+		Timer3.pwm(ROTARY_RINGER, 990);
 	} else {
 		Timer3.disablePwm(ROTARY_RINGER);
 		digitalWrite(ROTARY_RINGER, 0);
@@ -126,6 +133,7 @@ int Rotary::state_machine(void)
 	&& state != ROTARY_RINGING
 	&& state != ROTARY_RINGING_WAIT)
 	{
+		bell(0); // disable the pwm charge pump
 		stop_tone();
 		fona.hangUp();
 		new_state(ROTARY_ONHOOK);
@@ -142,36 +150,69 @@ int Rotary::state_machine(void)
 	case ROTARY_ONHOOK:
 		pulses = 0;
 		digits = 0;
+		bell_count = 0;
 
 		if(!onhook())
 			return new_state(ROTARY_PLAY_DIALTONE);
 
-		// once per second check for an incoming call
-		if (delta > 1000)
-			return new_state(ROTARY_ONHOOK_CHECK_STATUS);
+		if(ring())
+		{
+			bell(1);
+			return new_state(ROTARY_RINGING);
+		}
 
 		return 0;
-
-	case ROTARY_ONHOOK_CHECK_STATUS:
-		if (fona.getCallStatus() != 3)
-			return new_state(ROTARY_ONHOOK);
-
-		// XXX: this is where we should setup the PWM to
-		// drive the charge pump and the external ringer.
-		play_tone(1, 1000);
-		ring(1);
-		return new_state(ROTARY_RINGING);
 
 	case ROTARY_RINGING:
-		if (delta > 500)
-			return new_state(ROTARY_ONHOOK_CHECK_STATUS);
+		// If they pick up the phone, go to answered state
 		if (!onhook())
 			return new_state(ROTARY_ANSWERED);
-		return 0;
+
+		// if the phone stops ringing, go back to the
+		// onhook state
+		if (!ring())
+		{
+			bell(0);
+			return new_state(ROTARY_ONHOOK);
+		}
+
+		if (delta < 40)
+			return 0;
+
+		// alternate on and off to pulse the bell
+		last_transition = now;
+		bell(bell_count & 1);
+		if (bell_count++ < 50)
+			return 0;
+
+		bell_count = 0;
+		return new_state(ROTARY_RINGING_WAIT);
+
+	case ROTARY_RINGING_WAIT:
+		// this is the second of silence between rings
+		// If they pick up the phone, go to answered state
+		if (!onhook())
+			return new_state(ROTARY_ANSWERED);
+
+		// if the phone stops ringing, go back to the
+		// onhook state
+		if (!ring())
+		{
+			bell(0);
+			return new_state(ROTARY_ONHOOK);
+		}
+
+		if (delta < 500)
+			return 0;
+
+		// resume the bell
+		bell(1);
+		return new_state(ROTARY_RINGING);
 
 	case ROTARY_ANSWERED:
-		// XXX: disable the PWM for the charge pump
+		// disable the PWM for the charge pump
 		// and turn off the external ringer.
+		bell(0);
 		stop_tone();
 		fona.pickUp();
 		return new_state(ROTARY_ON_CALL);
