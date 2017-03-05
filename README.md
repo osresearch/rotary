@@ -43,7 +43,7 @@ Todo
 * ~~Incoming call state machine~~ - Done. Incoming calls works (although they play a tone in the speaker)
 * Disable headset ring tone.
 * Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it.
-* PCB design to mount FONA, Teensy and wire headers for the phone connections
+* PCB design to mount FONA, Teensy and wire headers for the phone connections. -- Started in `pcb/rotaryfona.sch`, but no where near ready.
 * Package everything to fit into the phone.
 * Buy a red phone, cut a hole for USB charging cable.
 * Teensy powered from the battery?  Battery switch?
