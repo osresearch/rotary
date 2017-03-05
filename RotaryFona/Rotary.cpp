@@ -11,19 +11,21 @@
  * BSD license, all text above must be included in any redistribution
  */
 
-#include "Rotary.h"
 #include <Arduino.h>
+#include "Rotary.h"
+#include "TimerThree.h"
 
 // todo move this into the constructor
 #define PULSE_DIAL	1 // rotary pin, normally closed
 #define PULSE_HOOK	2 // off hook == 0, on hook == 1
-
+#define ROTARY_RINGER	9 // pwm output for charge pump
 
 typedef enum {
 	ROTARY_INIT	= 0,
 	ROTARY_ONHOOK,
 	ROTARY_ONHOOK_CHECK_STATUS,
 	ROTARY_RINGING,
+	ROTARY_RINGING_WAIT,
 	ROTARY_ANSWERED,
 	ROTARY_PLAY_DIALTONE,
 	ROTARY_WAIT_FIRST_PULSE,
@@ -51,6 +53,8 @@ void Rotary::begin()
 	// Pull up on the rotary pulse pins
 	pinMode(PULSE_DIAL, INPUT_PULLUP);
 	pinMode(PULSE_HOOK, INPUT_PULLUP);
+
+	Timer3.initialize(10); // microsecond pulse width
 
 	new_state(ROTARY_INIT);
 }
@@ -95,6 +99,19 @@ void Rotary::loop()
 	state_machine();
 }
 
+
+void Rotary::ring(int state)
+{
+	if (state)
+	{
+		Timer3.pwm(ROTARY_RINGER, 900);
+	} else {
+		Timer3.disablePwm(ROTARY_RINGER);
+		digitalWrite(ROTARY_RINGER, 0);
+	}
+}
+
+
 int Rotary::state_machine(void)
 {
 	// compute the time since last transition
@@ -106,7 +123,8 @@ int Rotary::state_machine(void)
 	if(onhook()
 	&& state != ROTARY_ONHOOK
 	&& state != ROTARY_ONHOOK_CHECK_STATUS
-	&& state != ROTARY_RINGING)
+	&& state != ROTARY_RINGING
+	&& state != ROTARY_RINGING_WAIT)
 	{
 		stop_tone();
 		fona.hangUp();
@@ -141,6 +159,7 @@ int Rotary::state_machine(void)
 		// XXX: this is where we should setup the PWM to
 		// drive the charge pump and the external ringer.
 		play_tone(1, 1000);
+		ring(1);
 		return new_state(ROTARY_RINGING);
 
 	case ROTARY_RINGING:

@@ -33,6 +33,9 @@ private:
 	void play_tone(int tone, int len);
 	void stop_tone();
 
+	// make the phone ring (once)
+	void ring(int enable);
+
 	// Returns true if the phone is "on hook"
 	int onhook();
 
