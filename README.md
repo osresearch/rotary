@@ -30,5 +30,6 @@ Todo
 * Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it.
 * PCB design to mount FONA, Teensy and wire headers for the phone connections
 * Package everything to fit into the phone.
-* Buy a red phone, cut a hole for USB charging cable
+* Buy a red phone, cut a hole for USB charging cable.
 * Teensy powered from the battery?  Battery switch?
+* Figure out why 300 baud isn't working with the FONA as well as it did with my cellphone.
