@@ -1,10 +1,10 @@
 ![Outbound call state machine](https://farm4.staticflickr.com/3694/32869954060_f3c01daa31_z_d.jpg)
 
-This is an extension on Adafruit's `FONAtest.ino` example code to
-allow it to be used with a rotary phone.  The Teensy 2.0 decodes
-the pulses and implements the state machine to allow you to make
-place phone calls.  In-bound calls are not yet working; the
-ringer circuit is a work in progress.
+This is an extension on Adafruit's [`FONAtest.ino`](https://github.com/adafruit/Adafruit_FONA/blob/master/examples/FONAtest/FONAtest.ino)
+example code to allow it to be used with a rotary phone.  The Teensy
+2.0 decodes the pulses and implements the state machine to allow you to
+make place phone calls.  In-bound calls are not yet working; the ringer
+circuit is a work in progress.
 
 Wiring
 ===
