@@ -192,6 +192,9 @@ void printMenu(void) {
 typedef enum {
 	ROTARY_INIT	= 0,
 	ROTARY_ONHOOK,
+	ROTARY_ONHOOK_CHECK_STATUS,
+	ROTARY_RINGING,
+	ROTARY_ANSWERED,
 	ROTARY_PLAY_DIALTONE,
 	ROTARY_WAIT_FIRST_PULSE,
 	ROTARY_PLAY_ERRTONE,
@@ -267,19 +270,13 @@ int rotary_loop()
 	// compute the time since last transition
 	const uint32_t now = millis();
 	const uint32_t delta = now - rotary_last_transition;
-/*
-	Serial.print(now);
-	Serial.print(" ");
-	Serial.print(digitalRead(PULSE_HOOK));
-	Serial.print(rotary_onhook());
-	Serial.print(" ");
-	Serial.print(digitalRead(PULSE_DIAL));
-	Serial.print(rotary_dial());
-	Serial.println();
-*/
 
 	// all states have a reset when we go back on hook
-	if(rotary_onhook() && rotary_current_state != ROTARY_ONHOOK)
+	// except for the ringing states
+	if(rotary_onhook()
+	&& rotary_current_state != ROTARY_ONHOOK
+	&& rotary_current_state != ROTARY_ONHOOK_CHECK_STATUS
+	&& rotary_current_state != ROTARY_RINGING)
 	{
 		fona_stop_tone();
 		fona.hangUp();
@@ -301,7 +298,34 @@ int rotary_loop()
 		if(!rotary_onhook())
 			return rotary_state(ROTARY_PLAY_DIALTONE);
 
+		// once per second check for an incoming call
+		if (delta > 1000)
+			return rotary_state(ROTARY_ONHOOK_CHECK_STATUS);
+
 		return 0;
+
+	case ROTARY_ONHOOK_CHECK_STATUS:
+		if (fona.getCallStatus() != 3)
+			return rotary_state(ROTARY_ONHOOK);
+
+		// XXX: this is where we should setup the PWM to
+		// drive the charge pump and the external ringer.
+		fona.playToolkitTone(1, 1000);
+		return rotary_state(ROTARY_RINGING);
+
+	case ROTARY_RINGING:
+		if (delta > 500)
+			return rotary_state(ROTARY_ONHOOK_CHECK_STATUS);
+		if (!rotary_onhook())
+			return rotary_state(ROTARY_ANSWERED);
+		return 0;
+
+	case ROTARY_ANSWERED:
+		// XXX: disable the PWM for the charge pump
+		// and turn off the external ringer.
+		fona_stop_tone();
+		fona.pickUp();
+		return rotary_state(ROTARY_ON_CALL);
 
 	case ROTARY_PLAY_DIALTONE:
 		fona.playToolkitTone(20, 10000);
