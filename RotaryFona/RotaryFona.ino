@@ -69,7 +69,7 @@ uint8_t type;
 void setup() {
   rotary.begin();
 
-  while (!Serial);
+  //while (!Serial);
 
   Serial.begin(115200);
   Serial.println(F("FONA basic test"));
