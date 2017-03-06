@@ -46,10 +46,17 @@ Todo
 
 * Redial support.
 * ~~Incoming call state machine~~ - Done. Incoming calls works (although they play a tone in the speaker)
-* Disable headset ring tone.
-* Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it. -- Almost done.
+* ~~Disable headset ring tone.~~ - WONTFIX, since the bell overpowers it quite easily.
+* Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it. -- Almost done, need to find parameters to work with 3.7V LiPo.
 * PCB design to mount FONA, Teensy and wire headers for the phone connections. -- Started in `pcb/rotaryfona.sch`, but no where near ready.
 * Package everything to fit into the phone.
 * Buy a red phone, cut a hole for USB charging cable.
 * Teensy powered from the battery?  Battery switch?
 * Figure out why 300 baud isn't working with the FONA as well as it did with my cellphone.
+
+State Machine
+==
+![Rotary Phone State Machine](./states.svg)
+
+The rotary phone code is implemented as a state machine to try to
+keep it clean and easy to extend.
