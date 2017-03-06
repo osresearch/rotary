@@ -56,7 +56,9 @@ Todo
 
 State Machine
 ==
-![Rotary Phone State Machine](./states.svg)
+![Rotary Phone State Machine](https://rawgithub.com/osresearch/rotary/master/states.svg)
 
 The rotary phone code is implemented as a state machine to try to
-keep it clean and easy to extend.
+keep it clean and easy to extend. Unfortunately there isn't an easy way
+to round trip from the code to this diagram, so it doesn't exactly match
+the executable code in [`Rotary.cpp`](./RotaryFona/Rotary.cpp).
