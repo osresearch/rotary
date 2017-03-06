@@ -62,3 +62,5 @@ The rotary phone code is implemented as a state machine to try to
 keep it clean and easy to extend. Unfortunately there isn't an easy way
 to round trip from the code to this diagram, so it doesn't exactly match
 the executable code in [`Rotary.cpp`](./RotaryFona/Rotary.cpp).
+Also, nearly every state other than `RINGING` has an implicit edge
+back to `ON_HOOK` if the user hangs up the phone while in that state.
