@@ -66,7 +66,49 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
 uint8_t type;
 
+#include "TimerThree.h"
+
 void setup() {
+#if 0
+	Serial.begin(115200);
+	int pulse_width = 12;
+	Timer3.initialize(pulse_width); // microsecond pulse width
+	while(1)
+	{
+		int c = Serial.read();
+		if (c == -1)
+			continue;
+
+		if (c == '-' && pulse_width > 1)
+		{
+			pulse_width--;
+			Timer3.initialize(pulse_width); // microsecond pulse width
+		} else
+		if (c == '+' && pulse_width < 100)
+		{
+			pulse_width++;
+			Timer3.initialize(pulse_width); // microsecond pulse width
+		} else
+		if ('0' <= c && c <= '9')
+		{
+			int pwm = 1024 * (c - '0') / 10;
+			Serial.print(pulse_width);
+			Serial.print(" ");
+			Serial.println(pwm);
+
+			for(int i = 0 ; i < 10 ; i++)
+			{
+				Timer3.pwm(9, pwm);
+				delay(40);
+				Timer3.pwm(9, 0);
+				delay(40);
+			}
+		} else
+		{
+			Serial.println("?");
+		}
+	}
+#else
   rotary.begin();
 
   //while (!Serial);
@@ -120,6 +162,7 @@ void setup() {
   //fona.setHTTPSRedirect(true);
 
   printMenu();
+#endif
 }
 
 void printMenu(void) {

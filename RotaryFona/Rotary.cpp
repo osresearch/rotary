@@ -56,7 +56,7 @@ void Rotary::begin()
 	pinMode(PULSE_HOOK, INPUT_PULLUP);
 	pinMode(PULSE_RING, INPUT_PULLUP);
 
-	Timer3.initialize(10); // microsecond pulse width
+	Timer3.initialize(12); // microsecond pulse width
 
 	new_state(ROTARY_INIT);
 }
@@ -111,7 +111,7 @@ void Rotary::bell(int state)
 {
 	if (state)
 	{
-		Timer3.pwm(ROTARY_RINGER, 990);
+		Timer3.pwm(ROTARY_RINGER, 800);
 	} else {
 		Timer3.disablePwm(ROTARY_RINGER);
 		digitalWrite(ROTARY_RINGER, 0);
@@ -202,7 +202,7 @@ int Rotary::state_machine(void)
 			return new_state(ROTARY_ONHOOK);
 		}
 
-		if (delta < 500)
+		if (delta < 800)
 			return 0;
 
 		// resume the bell
