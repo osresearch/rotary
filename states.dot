@@ -1,0 +1,87 @@
+digraph finite_state_machine
+{
+	ranksep = 5;
+	//rankdir=LR;
+	//size="8,5"
+
+	node [shape = doublecircle]; On_Hook; On_Call; Answered; Dial_Number;
+	node [shape = circle];
+
+	subgraph cluster_inbound
+	{
+		label = "Inbound call";
+		Ringing;
+		Ringing_Wait;
+		Answered;
+	}
+	subgraph cluster_outbound
+	{
+		label = "Outbound call";
+		Play_Dialtone;
+		Wait_First_Pulse;
+		Pulse_Accum;
+		Pulse_Debounce;
+		Pulse_Falling;
+		Pulse_Wait;
+		Add_Digit;
+		Dial_Number;
+	}
+	subgraph cluster_oncall
+	{
+		label = "On call";
+		On_Call;
+		Check_Status;
+		Play_Endtone;
+		Pulse_Accum2;
+		Pulse_Debounce2;
+		Pulse_Falling2;
+		Pulse_Wait2;
+		Dial_Digit;
+	}
+
+	Init -> On_Hook [ label = "On hook" ];
+	Init -> Play_Error [ label = "Off hook" ];
+	On_Hook -> Play_Dialtone [ label = "Off hook" ];
+	Play_Error -> On_Hook [ label = "On hook" ];
+	Play_Error -> Wait_Hook;
+
+	Play_Dialtone -> Wait_First_Pulse;
+	Wait_First_Pulse -> Play_Error [ label = "Timeout" ];
+	Play_Error -> Wait_Hook;
+	Wait_Hook -> Play_Error [ label = "Timeout" ];
+	Wait_Hook -> On_Hook [ label = "On hook" ];
+	Wait_First_Pulse -> Pulse_Accum [ label = "Pulse"];
+
+	Pulse_Accum -> Pulse_Debounce;
+	Pulse_Debounce -> Pulse_Falling [ label = "Timeout"];
+	Pulse_Falling -> Pulse_Wait [ label = "!Pulse"];
+	Pulse_Wait -> Pulse_Accum [ label = "Pulse" ];
+	Pulse_Wait -> Add_Digit [ label = "Short timeout" ];
+	Add_Digit -> Pulse_Wait;
+	Add_Digit -> Play_Error [ label = "Too many" ];
+	Pulse_Wait -> Dial_Number [ label = "Long timeout" ];
+
+	Dial_Number -> On_Call;
+
+	On_Call -> On_Hook [ label = "On hook" ];
+	On_Call -> Check_Status [ label = "Timeout" ];
+	Check_Status -> On_Call;
+	Check_Status -> Play_Endtone [ label = "Hangup" ];
+	Play_Endtone -> Wait_Hook;
+	On_Call -> Pulse_Accum2 [ label = "Pulse" ];
+	Pulse_Accum2 -> Pulse_Debounce2;
+	Pulse_Debounce2 -> Pulse_Falling2 [ label = "Timeout" ];
+	Pulse_Falling2 -> Pulse_Wait2 [ label = "!Pulse" ];
+	Pulse_Wait2 -> Pulse_Accum2 [ label = "Pulse" ];
+	Pulse_Wait2 -> Dial_Digit [ label = "Timeout" ];
+	Dial_Digit -> On_Call;
+
+	On_Hook -> Ringing [ label = "Ring" ];
+	Ringing -> Ringing_Wait [ label = "Timeout" ];
+	Ringing_Wait -> Ringing [ label = "Timeout" ];
+	Ringing -> Answered [ label = "Off hook" ];
+	Ringing_Wait -> Answered [ label = "Off hook" ];
+	Answered -> On_Call;
+	Ringing -> On_Hook [ label = "!Ringing" ];
+	Ringing_Wait -> On_Hook [ label = "!Ringing" ];
+}
