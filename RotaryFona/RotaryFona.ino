@@ -91,18 +91,36 @@ void setup() {
 		} else
 		if ('0' <= c && c <= '9')
 		{
-			int pwm = 1024 * (c - '0') / 10;
+			int pwm = 800 + (1024-800) * (c - '0') / 10;
 			Serial.print(pulse_width);
 			Serial.print(" ");
 			Serial.println(pwm);
 
-			for(int i = 0 ; i < 10 ; i++)
+			Timer3.pwm(9, pwm);
+
+			// pre-charge the pump for 100 ms
+			pinMode(10, OUTPUT);
+			digitalWrite(10, 0);
+			delay(100);
+
+			// one second of ringing
+			for(int i = 0 ; i < 20 ; i++)
 			{
-				Timer3.pwm(9, pwm);
-				delay(40);
-				Timer3.pwm(9, 0);
-				delay(40);
+				// we want a 20 Hz ring,
+				// so pull high for half that time,
+				// then let it relax and recharge
+				// for the other half
+				digitalWrite(10, 1);
+				delay(22);
+				digitalWrite(10, 0);
+				delay(22);
 			}
+
+			digitalWrite(10, 1);
+			Timer3.pwm(9, 0);
+			delay(10);
+			digitalWrite(10, 0);
+
 		} else
 		{
 			Serial.println("?");
