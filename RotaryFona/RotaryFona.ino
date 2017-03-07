@@ -68,8 +68,9 @@ uint8_t type;
 
 #include "TimerThree.h"
 
-void setup() {
-#if 0
+void setup()
+{
+#if 1
 	Serial.begin(115200);
 	int pulse_width = 12;
 	Timer3.initialize(pulse_width); // microsecond pulse width
@@ -109,11 +110,13 @@ void setup() {
 				// we want a 20 Hz ring,
 				// so pull high for half that time,
 				// then let it relax and recharge
-				// for the other half
+				// for the other half (plus a bit)
+				// this improves charge pump peformance
+				// at low voltages
 				digitalWrite(10, 1);
-				delay(22);
+				delay(22-10);
 				digitalWrite(10, 0);
-				delay(22);
+				delay(22+10);
 			}
 
 			digitalWrite(10, 1);
