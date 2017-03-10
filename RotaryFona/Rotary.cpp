@@ -56,7 +56,10 @@ void Rotary::begin()
 	pinMode(PULSE_HOOK, INPUT_PULLUP);
 	pinMode(PULSE_RING, INPUT_PULLUP);
 
+	// charge pump ringer parameters
 	Timer3.initialize(12); // microsecond pulse width
+	pwm = 0;
+	ringer_voltage = 400;
 
 	new_state(ROTARY_INIT);
 }
@@ -109,13 +112,49 @@ void Rotary::loop()
 
 void Rotary::bell(int state)
 {
-	if (state)
+	digitalWrite(10, state);
+}
+
+
+void Rotary::charge_pump(
+	unsigned target
+)
+{
+	const unsigned max_pwm = 990;
+	const unsigned min_pwm = 100;
+
+	if (target == 0)
 	{
-		Timer3.pwm(ROTARY_RINGER, 800);
-	} else {
-		Timer3.disablePwm(ROTARY_RINGER);
-		digitalWrite(ROTARY_RINGER, 0);
+		// disable the charge pump, close the output
+		Timer3.pwm(9, 0);
+		digitalWrite(10, 0);
+		pwm = 0;
+		return;
 	}
+
+	if (pwm == 0)
+	{
+		// enable the PWM and pre-charge the pump for some time
+		pwm = 512;
+		pinMode(10, OUTPUT);
+		digitalWrite(10, 0);
+		Timer3.pwm(9, pwm);
+		return;
+	}
+
+	
+	// read the current value and compare it to our target
+	// if we are above the target, shorten the pwm
+	// if we are below the target, increase it
+	const unsigned val = analogRead(0);
+	if (val > target)
+	{
+		pwm = pwm - (pwm - min_pwm)/2;
+	} else {
+		pwm = pwm + (max_pwm - pwm)/2;
+	}
+
+	Timer3.pwm(9, pwm);
 }
 
 
@@ -133,7 +172,7 @@ int Rotary::state_machine(void)
 	&& state != ROTARY_RINGING
 	&& state != ROTARY_RINGING_WAIT)
 	{
-		bell(0); // disable the pwm charge pump
+		charge_pump(0);
 		stop_tone();
 		fona.hangUp();
 		new_state(ROTARY_ONHOOK);
@@ -172,9 +211,11 @@ int Rotary::state_machine(void)
 		// onhook state
 		if (!ring())
 		{
-			bell(0);
+			charge_pump(0);
 			return new_state(ROTARY_ONHOOK);
 		}
+
+		charge_pump(ringer_voltage);
 
 		if (delta < 40)
 			return 0;
@@ -198,9 +239,11 @@ int Rotary::state_machine(void)
 		// onhook state
 		if (!ring())
 		{
-			bell(0);
+			charge_pump(0);
 			return new_state(ROTARY_ONHOOK);
 		}
+
+		charge_pump(ringer_voltage);
 
 		if (delta < 800)
 			return 0;
@@ -212,7 +255,7 @@ int Rotary::state_machine(void)
 	case ROTARY_ANSWERED:
 		// disable the PWM for the charge pump
 		// and turn off the external ringer.
-		bell(0);
+		charge_pump(0);
 		stop_tone();
 		fona.pickUp();
 		return new_state(ROTARY_ON_CALL);
@@ -253,7 +296,7 @@ int Rotary::state_machine(void)
 		return new_state(ROTARY_PULSE_IGNORE);
 
 	case ROTARY_PULSE_IGNORE:
-		if (delta < 25)
+		if (delta < 15)
 			return 0;
 		return new_state(ROTARY_PULSE_FALLING);
 

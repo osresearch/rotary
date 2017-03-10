@@ -66,70 +66,9 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
 uint8_t type;
 
-#include "TimerThree.h"
 
 void setup()
 {
-#if 1
-	Serial.begin(115200);
-	int pulse_width = 12;
-	Timer3.initialize(pulse_width); // microsecond pulse width
-	while(1)
-	{
-		int c = Serial.read();
-		if (c == -1)
-			continue;
-
-		if (c == '-' && pulse_width > 1)
-		{
-			pulse_width--;
-			Timer3.initialize(pulse_width); // microsecond pulse width
-		} else
-		if (c == '+' && pulse_width < 100)
-		{
-			pulse_width++;
-			Timer3.initialize(pulse_width); // microsecond pulse width
-		} else
-		if ('0' <= c && c <= '9')
-		{
-			int pwm = 800 + (1024-800) * (c - '0') / 10;
-			Serial.print(pulse_width);
-			Serial.print(" ");
-			Serial.println(pwm);
-
-			Timer3.pwm(9, pwm);
-
-			// pre-charge the pump for 100 ms
-			pinMode(10, OUTPUT);
-			digitalWrite(10, 0);
-			delay(100);
-
-			// one second of ringing
-			for(int i = 0 ; i < 20 ; i++)
-			{
-				// we want a 20 Hz ring,
-				// so pull high for half that time,
-				// then let it relax and recharge
-				// for the other half (plus a bit)
-				// this improves charge pump peformance
-				// at low voltages
-				digitalWrite(10, 1);
-				delay(22-10);
-				digitalWrite(10, 0);
-				delay(22+10);
-			}
-
-			digitalWrite(10, 1);
-			Timer3.pwm(9, 0);
-			delay(10);
-			digitalWrite(10, 0);
-
-		} else
-		{
-			Serial.println("?");
-		}
-	}
-#else
   rotary.begin();
 
   //while (!Serial);
@@ -182,8 +121,12 @@ void setup()
   // the following line then redirects over SSL will be followed.
   //fona.setHTTPSRedirect(true);
 
+
+  // setup for the hard wired rotary phone
+  fona.setAudio(FONA_EXTAUDIO);
+  fona.setMicVolume(FONA_EXTAUDIO, 10);
+
   printMenu();
-#endif
 }
 
 void printMenu(void) {

@@ -35,7 +35,10 @@ private:
 	void play_tone(int tone, int len);
 	void stop_tone();
 
-	// charge the PWM to ring the bell once
+	// Enable the charge pump
+	void charge_pump(unsigned target);
+
+	// Route the charge pump output to ring the bell once
 	void bell(int enable);
 
 	// Returns true if the phone is "on hook"
@@ -47,4 +50,10 @@ private:
 	// Returns true when the Fona tells us that
 	// the phone is "ringing".
 	int ring();
+
+	// current pwm output
+	unsigned pwm;
+
+	// target voltage on the ringer feedback
+	unsigned ringer_voltage;
 };
