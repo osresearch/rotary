@@ -32,13 +32,17 @@ Wiring
 * Teensy Pin 6 -> FONA Ring indicator
 * Teensy Pin 7 -> FONA RX
 * Teensy Pin 8 -> FONA TX
-* Teensy Pin 9 -> boost converter input
-
-You will need a computer plugged into the Teensy right now
-since it doesn't initialize the FONA until the USB serial is
-connected.  This will need to be fixed for standalone operation.
+* Teensy Pin 9 -> boost converter pwm
+* Teensy Pin A0 -> boost converter voltge divider
 
 The boost converter circuit needs to be drawn.
+
+Note the [FONA 32u4 pinout](https://learn.adafruit.com/adafruit-feather-32u4-fona/pinouts) is a bit different:
+
+* GPIO 8 -> FONA TXD (Soft Serial)
+* GPIO 9 -> FONA RXD (Soft Serial)
+* GPIO 7 -> FONA Ring Indicator
+* GPIO 4 -> FONA Reset
 
 Todo
 ===
