@@ -52,11 +52,12 @@ Todo
 * ~~Incoming call state machine~~ - Done. Incoming calls works (although they play a tone in the speaker)
 * ~~Disable headset ring tone.~~ - WONTFIX, since the bell overpowers it quite easily.
 * Ringer driver circuit. Looks like 15V will engage the bell solenoid, so a simple charge pump and low frequency PWM should do it. -- Almost done, need to find parameters to work with 3.7V LiPo.
-* PCB design to mount FONA, Teensy and wire headers for the phone connections. -- Started in `pcb/rotaryfona.sch`, but no where near ready.
+* ~~PCB design to mount FONA, Teensy and wire headers for the phone connections. -- Started in `pcb/rotaryfona.sch`, but no where near ready.~~ On hold since the FONA 32u4 has a MCU built in.
 * Package everything to fit into the phone.
 * Buy a red phone, cut a hole for USB charging cable.
 * Teensy powered from the battery?  Battery switch?
 * Figure out why 300 baud isn't working with the FONA as well as it did with my cellphone.
+* Text to speech for SMS received - only supported in the 800H, not the 800L.
 
 State Machine
 ==
