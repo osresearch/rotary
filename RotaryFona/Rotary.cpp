@@ -13,13 +13,16 @@
 
 #include <Arduino.h>
 #include "Rotary.h"
+
+///// XXX: TODO need to make this use TimerOne now that we're using pin 11
 #include "TimerThree.h"
 
 // todo move this into the constructor
 #define PULSE_DIAL	1 // rotary pin, normally closed
 #define PULSE_HOOK	2 // off hook == 0, on hook == 1
-#define PULSE_RING	6 // off hook == 0, on hook == 1
-#define ROTARY_RINGER	9 // pwm output for charge pump
+#define PULSE_RING	6 // from the fona, when there is an incoming call
+#define ROTARY_PWM	11 // pwm output for charge pump
+#define ROTARY_RINGER	A1 // mosfet to dump voltage to the ringer
 
 typedef enum {
 	ROTARY_INIT	= 0,
@@ -57,9 +60,17 @@ void Rotary::begin()
 	pinMode(PULSE_RING, INPUT_PULLUP);
 
 	// charge pump ringer parameters
-	Timer3.initialize(12); // microsecond pulse width
+	//Timer3.initialize(12); // microsecond pulse width
 	pwm = 0;
 	ringer_voltage = 400;
+
+	// disable the ringer mosfet
+	pinMode(ROTARY_RINGER, OUTPUT);
+	digitalWrite(ROTARY_RINGER, 0);
+
+	// disable the pwm charge pump mosfet
+	pinMode(ROTARY_PWM, OUTPUT);
+	digitalWrite(ROTARY_PWM, 0);
 
 	new_state(ROTARY_INIT);
 }
@@ -112,7 +123,7 @@ void Rotary::loop()
 
 void Rotary::bell(int state)
 {
-	digitalWrite(10, state);
+	digitalWrite(ROTARY_RINGER, state);
 }
 
 
@@ -126,8 +137,8 @@ void Rotary::charge_pump(
 	if (target == 0)
 	{
 		// disable the charge pump, close the output
-		Timer3.pwm(9, 0);
-		digitalWrite(10, 0);
+		//Timer3.pwm(ROTARY_PWM, 0);
+		digitalWrite(ROTARY_RINGER, 0);
 		pwm = 0;
 		return;
 	}
@@ -136,9 +147,9 @@ void Rotary::charge_pump(
 	{
 		// enable the PWM and pre-charge the pump for some time
 		pwm = 512;
-		pinMode(10, OUTPUT);
-		digitalWrite(10, 0);
-		Timer3.pwm(9, pwm);
+		pinMode(ROTARY_RINGER, OUTPUT);
+		digitalWrite(ROTARY_RINGER, 0);
+		//Timer3.pwm(ROTARY_PWM, pwm);
 		return;
 	}
 
@@ -154,7 +165,7 @@ void Rotary::charge_pump(
 		pwm = pwm + (max_pwm - pwm)/2;
 	}
 
-	Timer3.pwm(9, pwm);
+	//Timer3.pwm(ROTARY_PWM, pwm);
 }
 
 
@@ -395,5 +406,84 @@ int Rotary::state_machine(void)
 		pulses = 0;
 
 		return new_state(ROTARY_ON_CALL);
+	}
+}
+
+
+void Rotary::tune(void)
+{
+	// disable the ringer mosfet
+	pinMode(ROTARY_RINGER, OUTPUT);
+	digitalWrite(ROTARY_RINGER, 0);
+
+	// disable the pwm charge pump mosfet
+	pinMode(ROTARY_PWM, OUTPUT);
+	digitalWrite(ROTARY_PWM, 0);
+
+	// fake ring pin
+	pinMode(A3, INPUT_PULLUP);
+
+	Serial.begin(115200);
+	int pulse_width = 12;
+	//Timer3.initialize(pulse_width); // microsecond pulse width
+
+	while(1)
+	{
+		int c = Serial.read();
+		if (c == -1)
+		{
+			if (digitalRead(A3))
+				continue;
+			// they pulled the pin down
+			c = '8';
+		}
+
+		if (c == '-' && pulse_width > 1)
+		{
+			pulse_width--;
+			//Timer3.initialize(pulse_width); // microsecond pulse width
+		} else
+		if (c == '+' && pulse_width < 100)
+		{
+			pulse_width++;
+			//Timer3.initialize(pulse_width); // microsecond pulse width
+		} else
+		if ('0' <= c && c <= '9')
+		{
+			int pwm = 0 + (1024-0) * (c - '0') / 10;
+			Serial.print(pulse_width);
+			Serial.print(" ");
+			Serial.println(pwm);
+
+			//Timer3.pwm(ROTARY_PWM, pwm);
+
+			// pre-charge the pump for 100 ms
+			digitalWrite(ROTARY_RINGER, 0);
+			delay(100);
+
+			// one second of ringing
+			for(int i = 0 ; i < 20 ; i++)
+			{
+				// we want a 20 Hz ring,
+				// so pull high for half that time,
+				// then let it relax and recharge
+				// for the other half (plus a bit)
+				// this improves charge pump peformance
+				// at low voltages
+				digitalWrite(ROTARY_RINGER, 1);
+				delay(22-10);
+				digitalWrite(ROTARY_RINGER, 0);
+				delay(22+10);
+			}
+
+			// disable the mosfets and charge pump
+			//Timer3.pwm(ROTARY_PWM, 0);
+			digitalWrite(ROTARY_RINGER, 0);
+			digitalWrite(ROTARY_PWM, 0);
+
+		} else
+		{
+			Serial.println("?");
+		}
 	}
 }

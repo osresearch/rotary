@@ -14,6 +14,9 @@ public:
 	void begin();
 	void loop();
 
+	// helper to just tune the charge pump
+	void tune();
+
 private:
 	Adafruit_FONA & fona;
 

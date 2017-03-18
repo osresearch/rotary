@@ -37,10 +37,10 @@ the commented section below at the end of the setup() function.
 #include "Adafruit_FONA.h"
 #include "Rotary.h"
 
-// Teensy hardware serial
-#define FONA_RX 7
+// Feather Fona 32u4 serial
+#define FONA_RX 9
 #define FONA_TX 8
-#define FONA_RST 0
+#define FONA_RST 4
 
 // this is a large buffer for replies
 char replybuffer[255];
@@ -48,12 +48,13 @@ char replybuffer[255];
 // We default to using software serial. If you want to use hardware serial
 // (because softserial isnt supported) comment out the following three lines 
 // and uncomment the HardwareSerial line
-//#include <SoftwareSerial.h>
-//SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
-//SoftwareSerial *fonaSerial = &fonaSS;
+#include <SoftwareSerial.h>
+SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
+SoftwareSerial *fonaSerial = &fonaSS;
 
-// Hardware serial is also possible!
-HardwareSerial *fonaSerial = &Serial1;
+// Hardware serial is also possible, but not wired on the
+// Feather Fona with the 32u4, so we have to use the software one
+//HardwareSerial *fonaSerial = &Serial1;
 
 // Use this for FONA 800 and 808s
 Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
@@ -66,9 +67,12 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
 uint8_t type;
 
-
 void setup()
 {
+#if 0
+  // charge pump tuning setup
+  rotary.tune();
+#else
   rotary.begin();
 
   //while (!Serial);
@@ -127,6 +131,7 @@ void setup()
   fona.setMicVolume(FONA_EXTAUDIO, 10);
 
   printMenu();
+#endif
 }
 
 void printMenu(void) {
@@ -199,7 +204,7 @@ void printMenu(void) {
 void loop() {
   Serial.print(F("FONA> "));
   while (! Serial.available() ) {
-    rotary.loop();
+    //rotary.loop();
 
     if (fona.available()) {
       Serial.write(fona.read());
